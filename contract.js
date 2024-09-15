@@ -39,7 +39,18 @@ async function deployToken(
       tokenDecimals
     );
 
-    await tx.wait();
+     console.log("Waiting for transaction confirmation...");
+    const receipt = await tx.wait(); // Wait for the transaction to be mined
+
+    const contractAddress = receipt.contractAddress; // This contains the contract address
+
+    if (contractAddress) {
+      console.log("Token deployed successfully:", contractAddress);
+      return contractAddress; // Return the contract address
+    } else {
+      console.log("Contract deployment failed.");
+      return null;
+    }
 
     console.log("Token deployed successfully:", tx.hash);
   } catch (error) {

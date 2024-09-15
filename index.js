@@ -12,6 +12,7 @@ const {
 }= require('./steps')
 const connectDB = require('./connect')
 const { generateWallet, importWallet, fetchAllWalletsFromDB, saveWalletToDB, fetchWalletFromDB  } = require('./wallet')
+const { deployToken } = require('./contract')
 
 
 
@@ -205,8 +206,16 @@ AddWalletScene.on('message', async (ctx) => {
         ctx.reply('❌ Error importing the wallet. Please make sure the private key is valid.');
     }
 });
-
-
+deployScene.action('deploy_token', async(ctx)=>{
+    const tokenName = ctx.session.tokenDetails.tokenName
+    const tokenSymbol = ctx.session.tokenDetails.tokenTicker
+   try {
+     const token = await deployToken(tokenName, tokenSymbol, 
+     )
+   } catch (error) {
+    
+   }
+})
 
 
 
