@@ -159,3 +159,9 @@ async function ExamplePerimeterForTx() {
     swapTransactions
   );
 }
+
+
+module.exports = {
+  deployToken,
+  enableTradingAddLpPeformSwap
+}
