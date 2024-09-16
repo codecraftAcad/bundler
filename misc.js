@@ -115,6 +115,60 @@ const simulatePrices = (
   console.log(`percentage price moved - ${perCentagePriceMoved}%`);
 };
 
+const getPriceEstimates = (
+  ethToAddToLP,
+  percentOfTokenToAddToLP,
+  bundlerPercent,
+  totalSupply
+) => {
+  const numberOfBuyers = bundlerPercent;
+  const totalPriceForBundlerPercent = calculatePriceForBundlePercent(
+    ethToAddToLP,
+    percentOfTokenToAddToLP,
+    bundlerPercent,
+    totalSupply
+  );
+  const ethNeededPerBuyer = totalPriceForBundlerPercent / numberOfBuyers;
+  const amountOfTokenToAddToLp = floor(
+    (totalSupply * percentOfTokenToAddToLP) / 100
+  );
+  const poolConstant = amountOfTokenToAddToLp * ethToAddToLP;
+  const startPriceOfToken = ethToAddToLP / amountOfTokenToAddToLp;
+  const startMarketCap = amountOfTokenToAddToLp * startPriceOfToken;
+  let poolTokenSupply = floor((totalSupply * percentOfTokenToAddToLP) / 100);
+  let poolEthSupply = ethToAddToLP;
+  let totalTokensBought = 0;
+  let currentTokenPrice = startPriceOfToken;
+  // for each buys update the  pool supply
+  // x token - token * y eth + eth = k
+  for (let i = 1; i <= numberOfBuyers; i++) {
+    poolEthSupply += ethNeededPerBuyer;
+    const ratioPoolConstantToPoolEth = poolConstant / poolEthSupply;
+    let tokensAmountBought = poolTokenSupply - ratioPoolConstantToPoolEth;
+    poolTokenSupply -= tokensAmountBought;
+    totalTokensBought += tokensAmountBought;
+
+    const priceOfToken = poolEthSupply / poolTokenSupply;
+    currentTokenPrice = priceOfToken;
+  }
+
+  // calculate market cap
+  // calculate % move in price
+  const endMarketCap = currentTokenPrice * amountOfTokenToAddToLp;
+  const percentagePriceMoved = (currentTokenPrice / startPriceOfToken) * 100;
+  return {
+    startPriceOfToken,
+    startMarketCap,
+    totalPriceForBundlerPercent,
+    currentTokenPrice,
+    endMarketCap,
+    pricePerTransaction: ethNeededPerBuyer,
+    percentagePriceMoved,
+    amountOfTokenToAddToLp,
+    ethToAddToLP,
+  };
+};
+
 const floor = (n) => {
   return Math.floor(n);
 };
