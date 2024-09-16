@@ -57,9 +57,6 @@ const saveBundleWalletToDB = async (walletAddress, privateKey, name) => {
 const createBundledWallet = async (numOfWallets)=>{
   try {
     const bundledWallets = web3.eth.accounts.wallet.create(numOfWallets)
-    for(i = 0; i< bundledWallets.length; i++){
-      await saveBundleWalletToDB(bundledWallets[i].address, bundledWallets[i].privateKey, `W${i + 1}` )
-    }
 
     console.log(bundledWallets)
     return bundledWallets

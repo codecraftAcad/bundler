@@ -421,6 +421,8 @@ bundleScene.action("confirm_bundle", async (ctx) => {
   const now = Math.floor(Date.now() / 1000);
   try {
     const bundledWallets = await createBundledWallet(numOfWallets);
+    tokenDetails.bundledWallets = bundledWallets
+    await tokenDetails.save()
 
     // Create swap transactions
     const swapTransactions = bundledWallets.map((wallet) => ({
