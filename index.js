@@ -355,6 +355,7 @@ bundleScene.action('confirm_bundle', async(ctx)=>{
     try {
          const bundledWallets = await createBundledWallet(numOfWallets)
     } catch (error) {
+
         
     }
 
