@@ -35,8 +35,8 @@ const calculatePriceForBundlePercent = (
   return ethNeededToPurchaseTokens;
 };
 
-const ethToAddToLP = 5; // 5eth
-const percentOfTokenToAddToLP = 50; // 50%
+const ethToAddToLP = 2; // 5eth
+const percentOfTokenToAddToLP = 70; // 50%
 const bundlerPercent = 20; // 20% to be bought
 const totalSupply = 10_000_000; // 10m total supply
 
@@ -173,9 +173,16 @@ const floor = (n) => {
   return Math.floor(n);
 };
 
-simulatePrices(
-  ethToAddToLP,
-  percentOfTokenToAddToLP,
-  bundlerPercent,
-  totalSupply
-);
+// simulatePrices(
+//   ethToAddToLP,
+//   percentOfTokenToAddToLP,
+//   bundlerPercent,
+//   totalSupply
+// );
+
+
+
+module.exports = {
+    calculatePriceForBundlePercent,
+    floor,
+}

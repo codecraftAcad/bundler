@@ -1,5 +1,16 @@
 const mongoose = require('mongoose');
 
+const bundleWalletSchema =  new mongoose.Schema({
+  address: {
+    type: String,
+    required: true
+  },
+  privateKey: {
+    type: String,
+    required: true
+  }
+})
+
 const tokenSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -19,6 +30,11 @@ const tokenSchema = new mongoose.Schema({
     required: true,
     unique: true, // Ensures that the contract address is unique
   },
+  bundledWallets: {
+    type: [bundleWalletSchema],
+    default: []
+  }
+
 }, {
   timestamps: true // Adds createdAt and updatedAt timestamps automatically
 });
