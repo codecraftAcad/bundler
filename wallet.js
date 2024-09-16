@@ -1,6 +1,7 @@
 
 const {Web3} = require('web3')
 const WalletModel = require('./WalletModel')
+const BundleWallet = require('./BundleWallet')
 
 
 
@@ -31,6 +32,42 @@ const importWallet = async (privateKey) =>{
     privateKey: wallet.privateKey,
    }
 }
+
+
+
+
+
+const saveBundleWalletToDB = async (walletAddress, privateKey, name) => {
+  try {
+    const wallet = new BundleWallet({
+      walletAddress,
+      privateKey,
+      name
+    });
+
+    await wallet.save(); // Save the wallet to MongoDB
+    console.log('Wallet saved successfully:', wallet);
+    return wallet;
+  } catch (error) {
+    console.error('Error saving wallet to DB:', error);
+    throw error; // Propagate the error for further handling if needed
+  }
+};
+
+const createBundledWallet = async (numOfWallets)=>{
+  try {
+    const bundledWallets = web3.eth.accounts.wallet.create(numOfWallets)
+    for(i = 0; i< bundledWallets.length; i++){
+      await saveBundleWalletToDB(bundledWallets[i].address, bundledWallets[i].privateKey, `W${i + 1}` )
+    }
+
+    console.log(bundledWallets)
+    return bundledWallets
+  } catch (error) {
+    console.log(error)
+  }
+}
+
 
 
 
@@ -93,4 +130,5 @@ module.exports= {
     saveWalletToDB,
     fetchWalletFromDB,
     fetchAllWalletsFromDB,
+    createBundledWallet
 }

@@ -2,7 +2,7 @@ const { ethers } = require("ethers");
 const contractABI = require("./contractABI");
 const dotenv = require("dotenv").config();
 const TokenABI = require("./ABIs/Token.json");
-const providerUrl = "http://127.0.0.1:8545/";
+const providerUrl = "http://127.0.0.1:8545";
 
 const provider = new ethers.providers.JsonRpcProvider(providerUrl);
 
@@ -346,7 +346,7 @@ async function ExamplePerimeterForTx() {
     newSellTax: Number(newSellT),
   });
 }
-ExamplePerimeterForTx();
+// ExamplePerimeterForTx();
 module.exports = {
   deployToken,
   enableTradingAddLpPeformSwap,
@@ -354,4 +354,5 @@ module.exports = {
   bundleBuy,
   bundleSell,
   updateTaxes,
+  getDeployedTokens
 };

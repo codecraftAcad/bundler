@@ -14,8 +14,10 @@ const {
     handleDeploySteps10
 }= require('./steps')
 const connectDB = require('./connect')
-const { generateWallet, importWallet, fetchAllWalletsFromDB, saveWalletToDB, fetchWalletFromDB  } = require('./wallet')
-const { deployToken } = require('./contract')
+const { generateWallet, importWallet, fetchAllWalletsFromDB, saveWalletToDB, fetchWalletFromDB, createBundledWallet  } = require('./wallet')
+const { deployToken, getDeployedTokens } = require('./contract')
+const Token = require('./TokenModel')
+const { handleBundleStep1, handleBundleStep2, handleBundleStep3, handleBundleStep4, handleBundleStep5 } = require('./bundleSteps')
 
 
 
@@ -30,11 +32,15 @@ const bot = new Telegraf(botToken)
 const deployScene = new Scenes.BaseScene('deployScene')
 const walletScene = new Scenes.BaseScene('walletScene')
 const AddWalletScene = new Scenes.BaseScene('addWalletScene')
+const tokenScene = new Scenes.BaseScene('tokenScene')
+const bundleScene = new Scenes.BaseScene('bundleScene')
 
 const stage = new Scenes.Stage([
     deployScene,
     walletScene,
-    AddWalletScene
+    AddWalletScene,
+    tokenScene,
+    bundleScene,
 ])
 bot.use(session())
 bot.use(stage.middleware())
@@ -95,14 +101,15 @@ deployScene.on('message', async (ctx)=>{
 
         case 10: 
         await handleDeploySteps10(ctx)
-          ctx.replyWithHTML(
-                `Thank you for the info. We've got all we need to deploy your token`,
-                Markup.inlineKeyboard([
-                    Markup.button.callback("Proceed to Deploy", "deploy_token"),
-                ])
-            );
-            // Reset the session state and leave the scene
-            ctx.session.stepCount = null;
+          ctx.reply(
+                `Thank you for the info. We've got all we need to deploy your token`,{
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{text: 'Proceed to deploy', callback_data: 'deploy_token'}]
+                        ]
+                    }
+                })
+            
             break;
 
 
@@ -220,19 +227,130 @@ AddWalletScene.on('message', async (ctx) => {
         ctx.reply('❌ Error importing the wallet. Please make sure the private key is valid.');
     }
 });
-deployScene.action('deploy_token', async(ctx)=>{
-    const tokenName = ctx.session.tokenDetails.tokenName
-    const tokenSymbol = ctx.session.tokenDetails.tokenTicker
-    const tokenDecimals = ctx.session.tokenDetails.tokenDecimals
-    const totalSupply = ctx.session.tokenDetails.totalSupply
-    const taxWallet = ctx.session.tokenDetails.taxWallet
+tokenScene.enter(async (ctx) => {
+  try {
+    const deployedTokens = await Token.find().exec();
 
-   try {
-     const token = await deployToken(tokenName, tokenSymbol, totalSupply, tokenDecimals, taxWallet 
-     )
-   } catch (error) {
+    if (deployedTokens.length === 0) {
+      // No tokens found
+      ctx.reply("You've not created any token", {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: 'Back', callback_data: 'back_button' }]
+          ]
+        }
+      });
+    } else {
+      // Tokens exist, show inline keyboard with token names and tickers side by side
+      const tokenButtons = [];
+      for (let i = 0; i < deployedTokens.length; i += 2) {
+        const row = [];
+        row.push({
+          text: deployedTokens[i].name,
+          callback_data: deployedTokens[i].contractAddress
+        });
+        if (deployedTokens[i + 1]) {
+          row.push({
+            text: deployedTokens[i + 1].name,
+            callback_data: deployedTokens[i + 1].contractAddress
+          });
+        }
+        tokenButtons.push(row);
+      }
+
+      ctx.replyWithHTML("<b>List of deployed tokens</b>\nPlease click on any token to view more details:", {
+        reply_markup: {
+          inline_keyboard: tokenButtons
+        }
+      });
+    }
+  } catch (error) {
+    // Handle error
+    console.error("Error fetching deployed tokens:", error);
+    ctx.reply("An error occurred while fetching deployed tokens. Please try again later.");
+  }
+});
+bundleScene.enter(async(ctx)=>{
+    ctx.reply("Please provide the buy tax value")
+
+    ctx.session.bundleDetails= {}
+
+    ctx.session.bundleSteps = 1
+})
+
+bundleScene.on('message', async (ctx) => {
+  const bundleSteps = ctx.session.bundleSteps || 1;
+
+  switch (bundleSteps) {
+    case 1:
+      await handleBundleStep1(ctx);
+      break;
+
+    case 2:
+      await handleBundleStep2(ctx);
+      break;
+
+    case 3:
+      await handleBundleStep3(ctx);
+      break;
+
+    case 4:
+      await handleBundleStep4(ctx);
+      break;
+
+    case 5:
+      await handleBundleStep5(ctx);
+      break;
+
+    case 6:
+      ctx.session.bundleDetails.bundlePercent = ctx.message.text;
+
+      // Display collected bundle details for confirmation
+      const { buyTax, sellTax, ethToAddToLP, amountOfTokenToAddToLp, addressToSendLPTo, bundlePercent } = ctx.session.bundleDetails;
+
+     await ctx.replyWithHTML(
+  `<b>Confirm the Bundle Details:</b>
+Buy Tax: ${buyTax}%
+Sell Tax: ${sellTax}%
+ETH to Add to LP: ${ethToAddToLP}
+Token Amount to add to LP: ${amountOfTokenToAddToLp}
+Address to send LP tokens to: ${addressToSendLPTo}
+Bundle Percent: ${bundlePercent}%`, 
+{
+  reply_markup: {
+    inline_keyboard: [
+      [{ text: 'Proceed with Bundle', callback_data: 'confirm_bundle' }],
+      [{ text: 'Simulate Bundle', callback_data: 'simulate_bundle' }]
+    ]
+  }
+});
+
+      break;
+    default:
+            // Handle unexpected steps or do nothing
+            ctx.reply('Unexpected input. Please follow the conversation flow.');
+            ctx.session.stepCount = null;
+            ctx.scene.leave();
+            break;
     
-   }
+  }
+});
+
+
+
+bundleScene.action('simulate_bundle', async(ctx)=>{
+    const numOfWallets = ctx.session.bundlePercent
+    const bundledWallets = await createBundledWallet(numOfWallets)
+})
+
+bundleScene.action('confirm_bundle', async(ctx)=>{
+    const numOfWallets = ctx.session.bundlePercent
+    try {
+         const bundledWallets = await createBundledWallet(numOfWallets)
+    } catch (error) {
+        
+    }
+
 })
 
 
@@ -245,13 +363,78 @@ deployScene.action('deploy_token', async(ctx)=>{
 
 
 
+deployScene.action('deploy_token', async(ctx)=>{
+    const tokenName = ctx.session.tokenDetails.tokenName
+    const tokenSymbol = ctx.session.tokenDetails.tokenTicker
+    const tokenDecimals = ctx.session.tokenDetails.tokenDecimals
+    const totalSupply = ctx.session.tokenDetails.totalSupply
+    const taxWallet = ctx.session.tokenDetails.taxWallet
+    console.log("deploying the token")
+
+   try {
+      console.log("trying to deploying the token")
+     const token = await deployToken(tokenName, tokenSymbol, totalSupply, tokenDecimals, taxWallet )
+     console.log(token)
+     const newToken = new Token({
+        name: tokenName,
+        ticker: tokenSymbol,
+        totalSupply: totalSupply,
+        contractAddress: token
+     })
+     ctx.session.tokenContractAddress = token
+     await newToken.save()
+     ctx.reply(`Token contract successfully deployed \n\n Contract address : ${token}`, {
+        reply_markup: {
+            inline_keyboard: [
+                [{text: 'proceed with bundle', callback_data: 'bundle'}]
+            ]
+        }
+     })
+   } catch (error) {
+    console.log(error)
+   }
+})
+tokenScene.on('callback_query', async(ctx)=>{
+     try {
+    const contractAddress = ctx.callbackQuery.data; // Get the ticker from the callback data
+
+    // Find the token associated with the ticker
+    const token = await Token.findOne({ contractAddress }).exec();
+
+    if (token) {
+      // Respond with token details
+      ctx.replyWithHTML(`
+        <b>Token Details</b>
+        Name: ${token.name}
+        Ticker: ${token.ticker}
+        Total Supply: ${token.totalSupply}
+        Contract Address: ${token.contractAddress}
+      `);
+      ctx.scene.leave()
+    } else {
+      // If no token is found with the given ticker
+      ctx.reply("Token not found.");
+      ctx.scene.leave()
+    }
+  } catch (error) {
+    console.error("Error handling callback query:", error);
+    ctx.reply("An error occurred while fetching token details. Please try again.");
+  }
+})
+deployScene.action('bundle', async(ctx)=>{
+    ctx.scene.enter('bundleScene', {contractAddress: ctx.session.contractAddress})
+})
+
+
+
+
 bot.start(async (ctx)=>{
     const username = ctx.from.username
     ctx.reply(`Hi ${username}, \n\n Welcome to the ETH bundler bot`,{
         reply_markup: {
             inline_keyboard: [
                 [{text: 'Deploy Token', callback_data: 'deploy'},
-                    {text: 'Token Details', callback_data: 'tokendeets'}
+                    {text: 'Tokens', callback_data: 'tokendeets'}
                 ],
                 [{text: 'Wallet', callback_data: 'wallet'}],
                 [
@@ -267,6 +450,9 @@ bot.start(async (ctx)=>{
 bot.action('deploy', async(ctx)=>{
     ctx.scene.enter('deployScene')
 })
+bot.action("tokendeets", async(ctx)=>{
+    ctx.scene.enter('tokenScene')
+})
 bot.action('wallet', async(ctx)=>{
     ctx.scene.enter('walletScene')
 })
@@ -280,6 +466,7 @@ bot.action('delete_message', async(ctx)=>{
 bot.action('back_button', async(ctx)=>{
     ctx.deleteMessage()
 })
+
 
 
 
