@@ -2,10 +2,11 @@ const { ethers } = require("ethers");
 const contractABI = require("./contractABI");
 const dotenv = require("dotenv").config();
 const TokenABI = require("./ABIs/Token.json");
-const providerUrl = "https://light-tetra-upright.ngrok-free.app";
+const providerUrl = "http://127.0.0.1:8545/";
+
 const provider = new ethers.providers.JsonRpcProvider(providerUrl);
 
-const contractAddress = "0xE634d83f8E016B04e51F2516e6086b5f238675C7";
+const contractAddress = "0x1f9c84B161b2c7FFB540BC5354543108cCE37df1";
 const contract = new ethers.Contract(contractAddress, contractABI, provider);
 const privateKey = process.env.PRIVATE_KEY;
 
@@ -17,7 +18,7 @@ async function getAdminAddress() {
     const adminAddress = await contract.adminAddress();
     console.log("Admin Address:", adminAddress);
   } catch (error) {
-    console.error("Error fetching admin address:", error);
+    console.error("Error fetching admin address:", error); 
   }
 }
 
