@@ -5,7 +5,7 @@ const TokenABI = require("./ABIs/Token.json");
 const providerUrl = "https://light-tetra-upright.ngrok-free.app";
 const provider = new ethers.providers.JsonRpcProvider(providerUrl);
 
-const contractAddress = "0xE634d83f8E016B04e51F2516e6086b5f238675C7";
+const contractAddress = "0xBc153693BFAe1Ca202872a382aED20a1306C9200";
 const contract = new ethers.Contract(contractAddress, contractABI, provider);
 const privateKey = process.env.PRIVATE_KEY;
 
@@ -39,20 +39,23 @@ async function deployToken(
       tokenDecimals
     );
 
-     console.log("Waiting for transaction confirmation...");
+    console.log("---------------------------------------");
+    console.log("Waiting for transaction confirmation...");
     const receipt = await tx.wait(); // Wait for the transaction to be mined
 
-    const contractAddress = receipt.contractAddress; // This contains the contract address
-
+    // const contractAddress = receipt.contractAddress; // This contains the contract address
+    const contractAddress = receipt.events[2].args[0]; // get the created token contract from the emitted event
     if (contractAddress) {
-      console.log("Token deployed successfully:", contractAddress);
+      console.log("---------------------------------------");
+      console.log("Token deployed successfully at:", contractAddress, {
+        hash: tx.hash,
+      });
+      console.log("---------------------------------------");
       return contractAddress; // Return the contract address
     } else {
       console.log("Contract deployment failed.");
       return null;
     }
-
-    console.log("Token deployed successfully:", tx.hash);
   } catch (error) {
     console.error("Error deploying token:", error);
   }
@@ -60,7 +63,7 @@ async function deployToken(
 
 async function getDeployedTokens() {
   const tokens = await contract.getTokens();
-  console.log(tokens);
+  console.log("deployed tokens", tokens);
   return tokens;
 }
 
@@ -78,15 +81,26 @@ async function enableTradingAddLpPeformSwap(
 ) {
   try {
     const taxes = [buyTax, sellTax];
-    let totalValue = 0;
-    for (let i = 0; i < listOfSwapTransactions.length; i++) {
-      const value = listOfSwapTransactions[i].etherBuyAmount;
-      totalValue += Number(value);
-    }
+    let totalValue = getTotalEthForTxs(listOfSwapTransactions);
 
     const fee = ethers.utils.parseEther(
-      ethers.utils.formatEther(String(totalValue + Number(ethToAddToLP)))
+      ethers.utils.formatEther(
+        String(Number(totalValue) + Number(ethToAddToLP))
+      )
     );
+    const estimateGas =
+      await contractWithSigner.estimateGas.enableTradingWithLqToUniswap(
+        tokenAddress,
+        taxes,
+        ethToAddToLP,
+        amountOfTokenToAddToLp,
+        amountOfMinTokens,
+        amountOfMinEth,
+        addressToSendLPTo,
+        deadline,
+        listOfSwapTransactions,
+        { value: fee }
+      );
     const tx = await contractWithSigner.enableTradingWithLqToUniswap(
       tokenAddress,
       taxes,
@@ -99,14 +113,112 @@ async function enableTradingAddLpPeformSwap(
       listOfSwapTransactions,
       { value: fee }
     );
-    console.log(tx);
+    const totalFee = ethers.utils.formatEther(
+      String(Number(fee) + Number(estimateGas) + 10000) // added 10000 cause estimate gas doesn't check inner function calls
+    );
+    console.log(
+      `successful enableTradingAddLpPeformSwap() - total ethspent approx: ${totalFee}`,
+      { hash: tx.hash }
+    );
   } catch (error) {
     console.log("Error from enableTradingAddLpPeformSwap()", error);
   }
 }
 
-// console.log(privateKey);
+async function sellTokensInAddress(
+  tokenAddress,
+  addressHoldingTokens,
+  sendEthTo,
+  amountOutMin,
+  deadline
+) {
+  try {
+    const sellTokenstx = await contractWithSigner.sellPerAddress(
+      tokenAddress,
+      addressHoldingTokens,
+      sendEthTo,
+      amountOutMin,
+      deadline
+    );
+    console.log("successful sellTokensInAddress()", sellTokenstx.hash);
+  } catch (error) {
+    console.log("error from sellTokensInAddress()", error);
+  }
+}
 
+async function bundleBuy(tokenAddress, listOfSwapTransactions) {
+  try {
+    const totalValue = getTotalEthForTxs(listOfSwapTransactions);
+    const estimateGas = await contractWithSigner.estimateGas.bundleBuys(
+      tokenAddress,
+      listOfSwapTransactions,
+      { value: totalValue }
+    );
+    const bundleBuyTx = await contractWithSigner.bundleBuys(
+      tokenAddress,
+      listOfSwapTransactions,
+      { value: totalValue }
+    );
+    const totalFee = ethers.utils.formatEther(
+      String(Number(totalValue) + Number(estimateGas) + 10000) // added 10000 cause estimate gas doesn't check inner function calls
+    );
+    console.log(
+      `successfull bundleBuy() - total ethspent approx: ${totalFee}`,
+      { hash: bundleBuyTx.hash }
+    );
+  } catch (error) {
+    console.log("Error from bundleBuy()", error);
+  }
+}
+
+async function bundleSell(tokenAddress, sendEthTo) {
+  try {
+    const bundleSellsTx = await contractWithSigner.bundleSells(
+      tokenAddress,
+      sendEthTo
+    );
+    console.log("successful bundelSell()", { hash: bundleSellsTx.hash });
+  } catch (error) {
+    console.log("Error from bundleSells()", error);
+  }
+}
+
+async function updateTaxes(tokenAddress, newBuyTax, newSellTax) {
+  const funcFrag = ["function updateTaxes(uint256 _buyTax, uint256 _sellTax)"];
+  const interface = new ethers.utils.Interface(funcFrag);
+  const funcSig = interface.encodeFunctionData("updateTaxes", [
+    newBuyTax,
+    newSellTax,
+  ]);
+
+  const transactions = [
+    {
+      to: tokenAddress,
+      functionSignature: funcSig,
+      value: 0n,
+    },
+  ];
+  try {
+    console.log(`functionSignature: ${funcSig}`);
+    const tx = await contractWithSigner.sendTransactions(transactions);
+
+    console.log(`successfully updated taxed: `, { hash: tx.hash });
+  } catch (error) {
+    console.log("Error from updateTaxes()", error);
+  }
+}
+
+function getTotalEthForTxs(listOfSwapTransactions) {
+  let totalValue = 0;
+  for (let i = 0; i < listOfSwapTransactions.length; i++) {
+    const value = listOfSwapTransactions[i].etherBuyAmount;
+    totalValue += Number(value);
+  }
+
+  return ethers.utils.parseEther(ethers.utils.formatEther(String(totalValue)));
+}
+
+// console.log(privateKey);
 // await deployToken(
 //   "TestToken",
 //   "TST",
@@ -115,29 +227,29 @@ async function enableTradingAddLpPeformSwap(
 //   "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 // );
 async function ExamplePerimeterForTx() {
-  // struct SwapTransaction {
-  //     address to;
-  //     uint256 etherBuyAmount;
-  //     uint256 minAmountToken;
-  //     uint256 swapDeadline;
-  // }
-
+  await deployToken(
+    "TestToken",
+    "TST",
+    10000000,
+    18,
+    "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  );
   const swapTransactions = [
     {
       to: "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
-      etherBuyAmount: ethers.utils.parseEther("0.05"),
+      etherBuyAmount: ethers.utils.parseEther("1"),
       minAmountToken: 0,
       swapDeadline: Math.floor(Date.now() / 1000),
     },
     {
       to: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
-      etherBuyAmount: ethers.utils.parseEther("0.05"),
+      etherBuyAmount: ethers.utils.parseEther("2"),
       minAmountToken: 0,
       swapDeadline: Math.floor(Date.now() / 1000),
     },
     {
       to: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
-      etherBuyAmount: ethers.utils.parseEther("0.05"),
+      etherBuyAmount: ethers.utils.parseEther("3"),
       minAmountToken: 0,
       swapDeadline: Math.floor(Date.now() / 1000),
     },
@@ -145,7 +257,7 @@ async function ExamplePerimeterForTx() {
 
   const tokens = await getDeployedTokens();
   const tokenAddress = tokens[tokens.length - 1];
-  console.log(tokenAddress);
+  console.log("tokenAddress", tokenAddress);
   const buyTax = 5;
   const sellTax = 10;
   const ethLP = ethers.utils.parseEther("10");
@@ -154,25 +266,91 @@ async function ExamplePerimeterForTx() {
   const token = new ethers.Contract(tokenAddress, TokenABI, signer);
   const tradingEnabled = await token.tradingEnabled();
   const bal = await token.balanceOf(signer.address);
-  console.log(signer.address);
-  console.log(bal, ethers.utils.formatEther(bal));
+  console.log("Token balance of owner", ethers.utils.formatEther(bal));
+  const holdersList = await contractWithSigner.getListOfHolders(tokenAddress);
+  console.log({ holdersList, tradingEnabled });
 
-  await enableTradingAddLpPeformSwap(
-    tokenAddress,
-    buyTax,
-    sellTax,
-    ethLP,
-    tokenAmount,
-    0,
-    0,
-    signer.address,
-    now,
-    swapTransactions
+  if (!tradingEnabled) {
+    // add lp, enable trading and buy tokens
+    await enableTradingAddLpPeformSwap(
+      tokenAddress,
+      buyTax,
+      sellTax,
+      ethLP,
+      tokenAmount,
+      0,
+      0,
+      signer.address,
+      now,
+      swapTransactions
+    );
+  }
+
+  // buy more tokens
+  await bundleBuy(tokenAddress, swapTransactions);
+
+  const holdersAfterBuys = await contractWithSigner.getListOfHolders(
+    tokenAddress
   );
+  const tradingEnabledAfterEnabling = await token.tradingEnabled();
+  console.log({ holdersAfterBuys, tradingEnabledAfterEnabling });
+
+  // sell tokens in an address
+  const ethBalBefore = await provider.getBalance(signer.address);
+  await sellTokensInAddress(
+    tokenAddress,
+    swapTransactions[0].to,
+    signer.address,
+    0,
+    Math.floor(Date.now() / 1000)
+  );
+  const ethBalAfter = await provider.getBalance(signer.address);
+  if (Number(ethBalAfter) > Number(ethBalBefore)) {
+    console.log(`sold from ${swapTransactions[0].to} successfully`, {
+      balBefore: ethers.utils.formatEther(ethBalBefore),
+      balAfter: ethers.utils.formatEther(ethBalAfter),
+    });
+  }
+
+  // sell tokens in all addresses
+  await bundleSell(tokenAddress, signer.address);
+  const ethBalNow = await provider.getBalance(signer.address);
+  if (Number(ethBalNow) > Number(ethBalAfter)) {
+    console.log("sold tokens in all addresses succesfully", {
+      balNow: ethers.utils.formatEther(ethBalNow),
+    });
+  }
+  const holdersListNow = await contractWithSigner.getListOfHolders(
+    tokenAddress
+  );
+  console.log({ holdersListNow });
+
+  console.log("-----------------------------------");
+  // previous taxes
+  const buyT = await token.buyTax();
+  const sellT = await token.sellTax();
+
+  console.log(`previous taxes: `, {
+    buyTax: Number(buyT),
+    sellTax: Number(sellT),
+  });
+  //update taxes
+  const newBuyTax = 10;
+  const newSellTax = 15;
+  await updateTaxes(tokenAddress, newBuyTax, newSellTax);
+  const newBuyT = await token.buyTax();
+  const newSellT = await token.sellTax();
+  console.log(`updated taxes: `, {
+    newBuyTax: Number(newBuyT),
+    newSellTax: Number(newSellT),
+  });
 }
-
-
+ExamplePerimeterForTx();
 module.exports = {
   deployToken,
-  enableTradingAddLpPeformSwap
-}
+  enableTradingAddLpPeformSwap,
+  sellTokensInAddress,
+  bundleBuy,
+  bundleSell,
+  updateTaxes,
+};

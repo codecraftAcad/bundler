@@ -10,6 +10,7 @@ const contractABI = [
     stateMutability: "nonpayable",
     type: "constructor",
   },
+  { inputs: [], name: "Bundler__HolderDoesNotExist", type: "error" },
   { inputs: [], name: "Bundler__NotEnoughEtherSent", type: "error" },
   { inputs: [], name: "Bundler__OnlyAdmin", type: "error" },
   {
@@ -89,6 +90,48 @@ const contractABI = [
     type: "function",
   },
   {
+    inputs: [
+      { internalType: "address", name: "tokenAddress", type: "address" },
+      {
+        components: [
+          { internalType: "address", name: "to", type: "address" },
+          {
+            internalType: "uint256",
+            name: "etherBuyAmount",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "minAmountToken",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "swapDeadline",
+            type: "uint256",
+          },
+        ],
+        internalType: "struct Bundler.SwapTransaction[]",
+        name: "swapTransactions",
+        type: "tuple[]",
+      },
+    ],
+    name: "bundleBuys",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "tokenAddress", type: "address" },
+      { internalType: "address", name: "sendEthTo", type: "address" },
+    ],
+    name: "bundleSells",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "coAdminAddress",
     outputs: [{ internalType: "address", name: "", type: "address" }],
@@ -156,6 +199,15 @@ const contractABI = [
     type: "function",
   },
   {
+    inputs: [
+      { internalType: "address", name: "tokenAddress", type: "address" },
+    ],
+    name: "getListOfHolders",
+    outputs: [{ internalType: "address[]", name: "", type: "address[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "getNumberOfTokens",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
@@ -185,6 +237,19 @@ const contractABI = [
       { internalType: "contract Token[]", name: "", type: "address[]" },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "tokenAddress", type: "address" },
+      { internalType: "address", name: "ownerAddress", type: "address" },
+      { internalType: "address", name: "sendEthTo", type: "address" },
+      { internalType: "uint256", name: "minAmount", type: "uint256" },
+      { internalType: "uint256", name: "deadline", type: "uint256" },
+    ],
+    name: "sellPerAddress",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
