@@ -122,6 +122,8 @@ async function enableTradingAddLpPeformSwap(
       { hash: tx.hash }
     );
 
+    return tx.hash
+
     
   } catch (error) {
     console.log("Error from enableTradingAddLpPeformSwap()", error);

@@ -386,6 +386,7 @@ bundleScene.action("simulate_bundle", async (ctx) => {
 });
 
 bundleScene.action("confirm_bundle", async (ctx) => {
+    await ctx.reply("Enabling trading, Adding Lp and buying with bundled wallets...")
   const numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
   const ethToAddToLP = parseInt(ctx.session.bundleDetails.ethToAddToLP);
   const ethToAddToLP2 = ethers.utils.parseEther(
@@ -447,6 +448,10 @@ bundleScene.action("confirm_bundle", async (ctx) => {
       swapTransactions
     );
 
+    ctx.reply(`Bundle successful, Check transaction using this transaction hash: ${bundled} ` )
+    ctx.scene.leave()
+    ctx.scene.enter('tokenScene')
+
     // Here you can proceed with sending the transactions or processing them
   } catch (error) {
     console.error("Error bundling wallets or creating transactions: ", error);
@@ -503,12 +508,20 @@ tokenScene.on("callback_query", async (ctx) => {
     if (token) {
       // Respond with token details
       ctx.replyWithHTML(`
-        <b>Token Details</b>
-        Name: ${token.name}
-        Ticker: ${token.ticker}
-        Total Supply: ${token.totalSupply}
-        Contract Address: ${token.contractAddress}
-      `);
+<b>Token Details</b>
+Name: ${token.name}
+Ticker: ${token.ticker}
+Total Supply: ${token.totalSupply}
+Contract Address: ${token.contractAddress}
+      `,{
+        reply_markup: {
+            inline_keyboard: [
+                [{text: 'Update Buy Tax', callback_data: 'change_buyTax'}, 
+                    {}
+                ]
+            ]
+        }
+      } );
       ctx.scene.leave();
     } else {
       // If no token is found with the given ticker
