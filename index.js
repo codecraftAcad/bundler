@@ -508,12 +508,20 @@ tokenScene.on("callback_query", async (ctx) => {
     if (token) {
       // Respond with token details
       ctx.replyWithHTML(`
-        <b>Token Details</b>
-        Name: ${token.name}
-        Ticker: ${token.ticker}
-        Total Supply: ${token.totalSupply}
-        Contract Address: ${token.contractAddress}
-      `);
+<b>Token Details</b>
+Name: ${token.name}
+Ticker: ${token.ticker}
+Total Supply: ${token.totalSupply}
+Contract Address: ${token.contractAddress}
+      `,{
+        reply_markup: {
+            inline_keyboard: [
+                [{text: 'Update Buy Tax', callback_data: 'change_buyTax'}, 
+                    {}
+                ]
+            ]
+        }
+      } );
       ctx.scene.leave();
     } else {
       // If no token is found with the given ticker
