@@ -398,6 +398,7 @@ deployScene.action("deploy_token", async (ctx) => {
   const taxWallet = ctx.session.tokenDetails.taxWallet;
   console.log("deploying the token");
 
+<<<<<<< HEAD
   try {
     console.log("trying to deploying the token");
     const token = await deployToken(
@@ -419,6 +420,57 @@ deployScene.action("deploy_token", async (ctx) => {
     ctx.reply(
       `Token contract successfully deployed \n\n Contract address : ${token}`,
       {
+=======
+bundleScene.action('confirm_bundle', async(ctx)=>{
+    const numOfWallets = ctx.session.bundlePercent
+    const contractAddress = ctx.session.contractAddress
+    const  tokenDetails = await Token.findOne({contractAddress}).exec()
+    if (!tokenDetails) {
+      console.log('Token not found');
+      return null;
+    }
+    const totalSupply = tokenDetails.totalSupply
+    try {
+         const bundledWallets = await createBundledWallet(numOfWallets)
+    } catch (error) {
+
+        
+    }
+
+})
+
+
+
+
+
+
+
+
+
+
+
+deployScene.action('deploy_token', async(ctx)=>{
+    const tokenName = ctx.session.tokenDetails.tokenName
+    const tokenSymbol = ctx.session.tokenDetails.tokenTicker
+    const tokenDecimals = ctx.session.tokenDetails.tokenDecimals
+    const totalSupply = ctx.session.tokenDetails.totalSupply
+    const taxWallet = ctx.session.tokenDetails.taxWallet
+    console.log("deploying the token")
+
+   try {
+      console.log("trying to deploying the token")
+     const token = await deployToken(tokenName, tokenSymbol, totalSupply, tokenDecimals, taxWallet )
+     console.log(token)
+     const newToken = new Token({
+        name: tokenName,
+        ticker: tokenSymbol,
+        totalSupply: totalSupply,
+        contractAddress: token
+     })
+     ctx.session.tokenContractAddress = token
+     await newToken.save()
+     ctx.reply(`Token contract successfully deployed \n\n Contract address : ${token}`, {
+>>>>>>> 682079f91114ba1aa02f9d5256a9c6967777e768
         reply_markup: {
           inline_keyboard: [
             [{ text: "proceed with bundle", callback_data: "bundle" }],
