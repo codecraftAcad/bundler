@@ -121,6 +121,8 @@ async function enableTradingAddLpPeformSwap(
       `successful enableTradingAddLpPeformSwap() - total ethspent approx: ${totalFee}`,
       { hash: tx.hash }
     );
+
+    
   } catch (error) {
     console.log("Error from enableTradingAddLpPeformSwap()", error);
   }

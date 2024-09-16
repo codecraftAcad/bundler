@@ -22,7 +22,11 @@ const {
   fetchWalletFromDB,
   createBundledWallet,
 } = require("./wallet");
-const { deployToken, getDeployedTokens } = require("./contract");
+const {
+  deployToken,
+  getDeployedTokens,
+  enableTradingAddLpPeformSwap,
+} = require("./contract");
 const Token = require("./TokenModel");
 const {
   handleBundleStep1,
@@ -31,6 +35,9 @@ const {
   handleBundleStep4,
   handleBundleStep5,
 } = require("./bundleSteps");
+const { parseEther } = require("ethers/lib/utils");
+const { calculatePriceForBundlePercent, floor } = require("./misc");
+const { ethers } = require("ethers");
 
 connectDB();
 
@@ -294,6 +301,8 @@ tokenScene.enter(async (ctx) => {
   }
 });
 bundleScene.enter(async (ctx) => {
+  const contractAddress = ctx.scene.state.contractAddress;
+  console.log(contractAddress);
   ctx.reply("Please provide the buy tax value");
 
   ctx.session.bundleDetails = {};
@@ -328,12 +337,12 @@ bundleScene.on("message", async (ctx) => {
     case 6:
       ctx.session.bundleDetails.bundlePercent = ctx.message.text;
 
-      // Display collected bundle details for confirmation
+      // Display collected  details for confirmation
       const {
         buyTax,
         sellTax,
         ethToAddToLP,
-        amountOfTokenToAddToLp,
+        percentageTokenToAddToLp,
         addressToSendLPTo,
         bundlePercent,
       } = ctx.session.bundleDetails;
@@ -343,7 +352,7 @@ bundleScene.on("message", async (ctx) => {
 Buy Tax: ${buyTax}%
 Sell Tax: ${sellTax}%
 ETH to Add to LP: ${ethToAddToLP}
-Token Amount to add to LP: ${amountOfTokenToAddToLp}
+Token Percent to add to LP: ${percentageTokenToAddToLp}%
 Address to send LP tokens to: ${addressToSendLPTo}
 Bundle Percent: ${bundlePercent}%`,
         {
@@ -377,17 +386,69 @@ bundleScene.action("simulate_bundle", async (ctx) => {
 });
 
 bundleScene.action("confirm_bundle", async (ctx) => {
-  const numOfWallets = ctx.session.bundlePercent;
-  const contractAddress = ctx.session.contractAddress;
+  const numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
+  const ethToAddToLP = parseInt(ctx.session.bundleDetails.ethToAddToLP);
+  const ethToAddToLP2 = ethers.utils.parseEther(
+    ctx.session.bundleDetails.ethToAddToLP
+  );
+  const buyTax = parseInt(ctx.session.bundleDetails.buyTax);
+  const sellTax = parseInt(ctx.session.bundleDetails.sellTax);
+  const percentageTokenToAddToLp = parseInt(
+    ctx.session.bundleDetails.percentageTokenToAddToLp
+  );
+  const contractAddress = ctx.scene.state.contractAddress;
+  const amountOfMinTokens = 0;
+  const amountOfMinEth = 0;
+  const addressToSendLPTo = ctx.session.bundleDetails.addressToSendLPTo;
+  console.log(contractAddress);
   const tokenDetails = await Token.findOne({ contractAddress }).exec();
   if (!tokenDetails) {
     console.log("Token not found");
     return null;
   }
   const totalSupply = tokenDetails.totalSupply;
+  const ethNeededToPurchaseTokens = calculatePriceForBundlePercent(
+    ethToAddToLP,
+    percentageTokenToAddToLp,
+    numOfWallets,
+    totalSupply
+  );
+  const amountOfTokenToAddToLp = floor(
+    (totalSupply * percentageTokenToAddToLp) / 100
+  );
+  const ethPerWallet = ethNeededToPurchaseTokens / numOfWallets;
+  console.log(ethNeededToPurchaseTokens);
+  const now = Math.floor(Date.now() / 1000);
   try {
     const bundledWallets = await createBundledWallet(numOfWallets);
-  } catch (error) {}
+
+    // Create swap transactions
+    const swapTransactions = bundledWallets.map((wallet) => ({
+      to: wallet.address,
+      etherBuyAmount: ethers.utils.parseEther(ethPerWallet.toString()), // Convert ETH per wallet to wei
+      minAmountToken: 0, // Set your required min token amount
+      swapDeadline: Math.floor(Date.now() / 1000) + 3600, // Set deadline to 1 hour from current time
+    }));
+
+    console.log("Generated Swap Transactions: ", swapTransactions);
+
+    const bundled = await enableTradingAddLpPeformSwap(
+      contractAddress,
+      buyTax,
+      sellTax,
+      ethToAddToLP2,
+      amountOfTokenToAddToLp,
+      amountOfMinTokens,
+      amountOfMinEth,
+      addressToSendLPTo,
+      now,
+      swapTransactions
+    );
+
+    // Here you can proceed with sending the transactions or processing them
+  } catch (error) {
+    console.error("Error bundling wallets or creating transactions: ", error);
+  }
 });
 
 deployScene.action("deploy_token", async (ctx) => {
@@ -398,7 +459,6 @@ deployScene.action("deploy_token", async (ctx) => {
   const taxWallet = ctx.session.tokenDetails.taxWallet;
   console.log("deploying the token");
 
-<<<<<<< HEAD
   try {
     console.log("trying to deploying the token");
     const token = await deployToken(
@@ -420,57 +480,6 @@ deployScene.action("deploy_token", async (ctx) => {
     ctx.reply(
       `Token contract successfully deployed \n\n Contract address : ${token}`,
       {
-=======
-bundleScene.action('confirm_bundle', async(ctx)=>{
-    const numOfWallets = ctx.session.bundlePercent
-    const contractAddress = ctx.session.contractAddress
-    const  tokenDetails = await Token.findOne({contractAddress}).exec()
-    if (!tokenDetails) {
-      console.log('Token not found');
-      return null;
-    }
-    const totalSupply = tokenDetails.totalSupply
-    try {
-         const bundledWallets = await createBundledWallet(numOfWallets)
-    } catch (error) {
-
-        
-    }
-
-})
-
-
-
-
-
-
-
-
-
-
-
-deployScene.action('deploy_token', async(ctx)=>{
-    const tokenName = ctx.session.tokenDetails.tokenName
-    const tokenSymbol = ctx.session.tokenDetails.tokenTicker
-    const tokenDecimals = ctx.session.tokenDetails.tokenDecimals
-    const totalSupply = ctx.session.tokenDetails.totalSupply
-    const taxWallet = ctx.session.tokenDetails.taxWallet
-    console.log("deploying the token")
-
-   try {
-      console.log("trying to deploying the token")
-     const token = await deployToken(tokenName, tokenSymbol, totalSupply, tokenDecimals, taxWallet )
-     console.log(token)
-     const newToken = new Token({
-        name: tokenName,
-        ticker: tokenSymbol,
-        totalSupply: totalSupply,
-        contractAddress: token
-     })
-     ctx.session.tokenContractAddress = token
-     await newToken.save()
-     ctx.reply(`Token contract successfully deployed \n\n Contract address : ${token}`, {
->>>>>>> 682079f91114ba1aa02f9d5256a9c6967777e768
         reply_markup: {
           inline_keyboard: [
             [{ text: "proceed with bundle", callback_data: "bundle" }],
@@ -512,8 +521,8 @@ tokenScene.on("callback_query", async (ctx) => {
   }
 });
 deployScene.action("bundle", async (ctx) => {
-  ctx.scene.enter("bundleScene", {
-    contractAddress: ctx.session.contractAddress,
+  await ctx.scene.enter("bundleScene", {
+    contractAddress: ctx.session.tokenContractAddress,
   });
 });
 
