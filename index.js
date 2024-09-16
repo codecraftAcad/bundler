@@ -386,6 +386,7 @@ bundleScene.action("simulate_bundle", async (ctx) => {
 });
 
 bundleScene.action("confirm_bundle", async (ctx) => {
+    await ctx.reply("Enabling trading, Adding Lp and buying with bundled wallets...")
   const numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
   const ethToAddToLP = parseInt(ctx.session.bundleDetails.ethToAddToLP);
   const ethToAddToLP2 = ethers.utils.parseEther(
@@ -446,6 +447,10 @@ bundleScene.action("confirm_bundle", async (ctx) => {
       now,
       swapTransactions
     );
+
+    ctx.reply(`Bundle successful, Check transaction using this transaction hash: ${bundled} ` )
+    ctx.scene.leave()
+    ctx.scene.enter('tokenScene')
 
     // Here you can proceed with sending the transactions or processing them
   } catch (error) {
