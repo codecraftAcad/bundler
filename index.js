@@ -386,7 +386,9 @@ bundleScene.action("simulate_bundle", async (ctx) => {
 });
 
 bundleScene.action("confirm_bundle", async (ctx) => {
-    await ctx.reply("Enabling trading, Adding Lp and buying with bundled wallets...")
+  await ctx.reply(
+    "Enabling trading, Adding Lp and buying with bundled wallets..."
+  );
   const numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
   const ethToAddToLP = parseInt(ctx.session.bundleDetails.ethToAddToLP);
   const ethToAddToLP2 = ethers.utils.parseEther(
@@ -422,8 +424,8 @@ bundleScene.action("confirm_bundle", async (ctx) => {
   const now = Math.floor(Date.now() / 1000);
   try {
     const bundledWallets = await createBundledWallet(numOfWallets);
-    tokenDetails.bundledWallets = bundledWallets
-    await tokenDetails.save()
+    tokenDetails.bundledWallets = bundledWallets;
+    await tokenDetails.save();
 
     // Create swap transactions
     const swapTransactions = bundledWallets.map((wallet) => ({
@@ -448,9 +450,11 @@ bundleScene.action("confirm_bundle", async (ctx) => {
       swapTransactions
     );
 
-    ctx.reply(`Bundle successful, Check transaction using this transaction hash: ${bundled} ` )
-    ctx.scene.leave()
-    ctx.scene.enter('tokenScene')
+    ctx.reply(
+      `Bundle successful, Check transaction using this transaction hash: ${bundled} `
+    );
+    ctx.scene.leave();
+    ctx.scene.enter("tokenScene");
 
     // Here you can proceed with sending the transactions or processing them
   } catch (error) {
@@ -507,21 +511,22 @@ tokenScene.on("callback_query", async (ctx) => {
 
     if (token) {
       // Respond with token details
-      ctx.replyWithHTML(`
+      ctx.replyWithHTML(
+        `
 <b>Token Details</b>
 Name: ${token.name}
 Ticker: ${token.ticker}
 Total Supply: ${token.totalSupply}
 Contract Address: ${token.contractAddress}
-      `,{
-        reply_markup: {
+      `,
+        {
+          reply_markup: {
             inline_keyboard: [
-                [{text: 'Update Buy Tax', callback_data: 'change_buyTax'}, 
-                    {}
-                ]
-            ]
+              [{ text: "Update Buy Tax", callback_data: "change_buyTax" }, {}],
+            ],
+          },
         }
-      } );
+      );
       ctx.scene.leave();
     } else {
       // If no token is found with the given ticker
