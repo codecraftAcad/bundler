@@ -347,6 +347,11 @@ bundleScene.action('confirm_bundle', async(ctx)=>{
     const numOfWallets = ctx.session.bundlePercent
     const contractAddress = ctx.session.contractAddress
     const  tokenDetails = await Token.findOne({contractAddress}).exec()
+    if (!tokenDetails.) {
+      console.log('Token not found');
+      return null;
+    }
+    const totalSupply = tokenDetails.totalSupply
     try {
          const bundledWallets = await createBundledWallet(numOfWallets)
     } catch (error) {
