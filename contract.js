@@ -2,7 +2,8 @@ const { ethers } = require("ethers");
 const contractABI = require("./contractABI");
 const dotenv = require("dotenv").config();
 const TokenABI = require("./ABIs/Token.json");
-const providerUrl = "https://light-tetra-upright.ngrok-free.app";
+const providerUrl = "http://127.0.0.1:8545/";
+
 const provider = new ethers.providers.JsonRpcProvider(providerUrl);
 
 const contractAddress = "0xBc153693BFAe1Ca202872a382aED20a1306C9200";

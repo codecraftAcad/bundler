@@ -8,7 +8,10 @@ const {
     handleDeploySteps5,
     handleDeploySteps6,
     handleDeploySteps7,
-    handleSkip
+    handleSkip,
+    handleDeploySteps8,
+    handleDeploySteps9,
+    handleDeploySteps10
 }= require('./steps')
 const connectDB = require('./connect')
 const { generateWallet, importWallet, fetchAllWalletsFromDB, saveWalletToDB, fetchWalletFromDB  } = require('./wallet')
@@ -80,15 +83,26 @@ deployScene.on('message', async (ctx)=>{
         
         case 7:
             await handleDeploySteps7(ctx)
-              ctx.replyWithHTML(
+            break;
+
+        case 8: 
+        await handleDeploySteps8(ctx)
+        break;
+
+        case 9: 
+        await handleDeploySteps9(ctx)
+        break;
+
+        case 10: 
+        await handleDeploySteps10(ctx)
+          ctx.replyWithHTML(
                 `Thank you for the info. We've got all we need to deploy your token`,
                 Markup.inlineKeyboard([
                     Markup.button.callback("Proceed to Deploy", "deploy_token"),
                 ])
             );
             // Reset the session state and leave the scene
-            ctx.session.tokenDetails = null;
-            ctx.scene.leave();
+            ctx.session.stepCount = null;
             break;
 
 
@@ -209,8 +223,12 @@ AddWalletScene.on('message', async (ctx) => {
 deployScene.action('deploy_token', async(ctx)=>{
     const tokenName = ctx.session.tokenDetails.tokenName
     const tokenSymbol = ctx.session.tokenDetails.tokenTicker
+    const tokenDecimals = ctx.session.tokenDetails.tokenDecimals
+    const totalSupply = ctx.session.tokenDetails.totalSupply
+    const taxWallet = ctx.session.tokenDetails.taxWallet
+
    try {
-     const token = await deployToken(tokenName, tokenSymbol, 
+     const token = await deployToken(tokenName, tokenSymbol, totalSupply, tokenDecimals, taxWallet 
      )
    } catch (error) {
     

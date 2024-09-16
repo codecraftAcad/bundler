@@ -1,4 +1,4 @@
-const contractABI = [
+[
   {
     inputs: [
       {
@@ -284,5 +284,3 @@ const contractABI = [
     type: "function",
   },
 ];
-
-module.exports = contractABI;
