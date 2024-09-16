@@ -185,4 +185,5 @@ const floor = (n) => {
 module.exports = {
     calculatePriceForBundlePercent,
     floor,
+    getPriceEstimates
 }

@@ -36,7 +36,11 @@ const {
   handleBundleStep5,
 } = require("./bundleSteps");
 const { parseEther } = require("ethers/lib/utils");
-const { calculatePriceForBundlePercent, floor } = require("./misc");
+const {
+  calculatePriceForBundlePercent,
+  floor,
+  getPriceEstimates,
+} = require("./misc");
 const { ethers } = require("ethers");
 
 connectDB();
@@ -381,8 +385,54 @@ Bundle Percent: ${bundlePercent}%`,
 });
 
 bundleScene.action("simulate_bundle", async (ctx) => {
-  const numOfWallets = ctx.session.bundlePercent;
-  const bundledWallets = await createBundledWallet(numOfWallets);
+  const numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
+  const ethToAddToLP = parseInt(ctx.session.bundleDetails.ethToAddToLP);
+  const percentageTokenToAddToLp = parseInt(
+    ctx.session.bundleDetails.percentageTokenToAddToLp
+  );
+  const tokenDetails = await Token.findOne({ contractAddress }).exec();
+  if (!tokenDetails) {
+    console.log("Token not found");
+    return null;
+  }
+  const totalSupply = tokenDetails.totalSupply;
+  try {
+    const {
+      startPriceOfToken,
+      startMarketCap,
+      totalPriceForBundlerPercent,
+      currentTokenPrice,
+      endMarketCap,
+      pricePerTransaction,
+      percentagePriceMoved,
+      amountOfTokenToAddToLp,
+    } = getPriceEstimates(
+      ethToAddToLP,
+      percentageTokenToAddToLp,
+      numOfWallets,
+      totalSupply
+    );
+
+    ctx.replyWithHTML(
+      `
+<b>Bundler Simulation Result:  </b>
+Initial Token Price: ${startPriceOfToken}
+Initial MC: ${startMarketCap}
+Total Bundler Cost: ${totalPriceForBundlerPercent}
+Cost Per Bundler wallet: ${pricePerTransaction}
+Token quantity to LP : ${amountOfTokenToAddToLp}
+Percentage Increase(after bundle buys): ${percentagePriceMoved}
+Final MC(after bundle buy): ${endMarketCap}
+    `,
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: "back", callback_data: "back_button" }]],
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 bundleScene.action("confirm_bundle", async (ctx) => {
@@ -522,7 +572,14 @@ Contract Address: ${token.contractAddress}
         {
           reply_markup: {
             inline_keyboard: [
-              [{ text: "Update Buy Tax", callback_data: "change_buyTax" }, {}],
+              [
+                { text: "Update Buy Tax", callback_data: "change_buyTax" },
+                { text: "Update Buy Tax", callback_data: "change_sellTax" },
+              ],
+              [
+                { text: "Sell Holdings", callback_data: "sell_holdings" },
+                { text: "Sell all Holdings", callback_data: "sell_all" },
+              ],
             ],
           },
         }
