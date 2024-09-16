@@ -30,6 +30,10 @@ const tokenSchema = new mongoose.Schema({
     required: true,
     unique: true, // Ensures that the contract address is unique
   },
+  tokenDecimal: {
+    type: Number,
+    required:true
+  },
   bundledWallets: {
     type: [bundleWalletSchema],
     default: []
