@@ -2,11 +2,11 @@ const { ethers } = require("ethers");
 const contractABI = require("./contractABI");
 const dotenv = require("dotenv").config();
 const TokenABI = require("./ABIs/Token.json");
-const providerUrl = "http://127.0.0.1:8545";
+const providerUrl = "https://asp-ample-marginally.ngrok-free.app/";
 
 const provider = new ethers.providers.JsonRpcProvider(providerUrl);
 
-const contractAddress = "0xBc153693BFAe1Ca202872a382aED20a1306C9200";
+const contractAddress = "0xf09e7Af8b380cD01BD0d009F83a6b668A47742ec";
 const contract = new ethers.Contract(contractAddress, contractABI, provider);
 const privateKey = process.env.PRIVATE_KEY;
 
@@ -133,19 +133,31 @@ async function enableTradingAddLpPeformSwap(
 async function sellTokensInAddress(
   tokenAddress,
   addressHoldingTokens,
+  percentToSell,
   sendEthTo,
   amountOutMin,
   deadline
 ) {
+   const ethBalBefore = await provider.getBalance(signer.address);
   try {
     const sellTokenstx = await contractWithSigner.sellPerAddress(
       tokenAddress,
       addressHoldingTokens,
+      percentToSell,
       sendEthTo,
       amountOutMin,
       deadline
     );
+    const ethBalAfter = await provider.getBalance(signer.address);
+  if (Number(ethBalAfter) > Number(ethBalBefore)) {
+    console.log(`sold from ${sendEthTo} successfully`, {
+      balBefore: ethers.utils.formatEther(ethBalBefore),
+      balAfter: ethers.utils.formatEther(ethBalAfter),
+    });
+  }
+ 
     console.log("successful sellTokensInAddress()", sellTokenstx.hash);
+     return sellTokenstx.hash
   } catch (error) {
     console.log("error from sellTokensInAddress()", error);
   }
@@ -176,13 +188,15 @@ async function bundleBuy(tokenAddress, listOfSwapTransactions) {
   }
 }
 
-async function bundleSell(tokenAddress, sendEthTo) {
+async function bundleSell(tokenAddress, sendEthTo, percentToSell) {
   try {
     const bundleSellsTx = await contractWithSigner.bundleSells(
       tokenAddress,
-      sendEthTo
+      sendEthTo,
+      percentToSell
     );
     console.log("successful bundelSell()", { hash: bundleSellsTx.hash });
+    return bundleSellsTx.hash
   } catch (error) {
     console.log("Error from bundleSells()", error);
   }
@@ -350,6 +364,42 @@ async function ExamplePerimeterForTx() {
     newSellTax: Number(newSellT),
   });
 }
+
+const getBuyTax = async(tokenAddress)=>{
+  const token = new ethers.Contract(tokenAddress, TokenABI, signer);
+  const buyTax = await token.buyTax()
+
+  console.log(Number(buyTax))
+  return Number(buyTax)
+}
+
+const getSellTax = async(tokenAddress)=>{
+   const token = new ethers.Contract(tokenAddress, TokenABI, signer);
+  const sellTax = await token.sellTax()
+
+  console.log(Number(sellTax))
+  return Number(sellTax)
+}
+
+
+
+const getTokenBalance = async (tokenAddress, walletAddress) => {
+  const token = new ethers.Contract(tokenAddress, TokenABI, signer);
+
+  
+  const tokenBalance = await token.balanceOf(walletAddress);
+
+  const decimals = await token.decimals();
+
+  
+  const formattedBalance = ethers.utils.formatUnits(tokenBalance, decimals);
+
+
+  console.log(Number(formattedBalance).toFixed(1));
+  return Number(formattedBalance).toFixed(1)
+};
+
+
 // ExamplePerimeterForTx();
 module.exports = {
   deployToken,
@@ -358,5 +408,8 @@ module.exports = {
   bundleBuy,
   bundleSell,
   updateTaxes,
-  getDeployedTokens
+  getDeployedTokens,
+  getBuyTax,
+  getSellTax,
+  getTokenBalance
 };
