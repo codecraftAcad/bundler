@@ -535,7 +535,7 @@ deployScene.action("deploy_token", async (ctx) => {
       ticker: tokenSymbol,
       totalSupply: totalSupply,
       contractAddress: token,
-      tokenDecimal: tokenDecimals
+      tokenDecimal: tokenDecimals,
     });
     ctx.session.tokenContractAddress = token;
     await newToken.save();
