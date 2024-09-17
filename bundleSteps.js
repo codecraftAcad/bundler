@@ -21,7 +21,7 @@ const handleBundleStep3 = async(ctx)=>{
 
 const handleBundleStep4 = async (ctx)=>{
     ctx.session.bundleDetails.percentageTokenToAddToLp = ctx.message.text
-    ctx.reply("Please provide address to send lp tokens to \n\n Example: 50% supply = 50")
+    ctx.reply("Please provide address to send lp tokens to ")
      ctx.session.bundleSteps = 5
 }
 

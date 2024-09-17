@@ -1,3 +1,5 @@
+const { ethers } = require("ethers");
+
 const calculatePriceForBundlePercent = (
   ethToAddToLP,
   percentOfTokenToAddToLP,
@@ -38,7 +40,10 @@ const calculatePriceForBundlePercent = (
 const ethToAddToLP = 2; // 5eth
 const percentOfTokenToAddToLP = 70; // 50%
 const bundlerPercent = 20; // 20% to be bought
-const totalSupply = 10_000_000; // 10m total supply
+const totalSupply = 10000000;
+
+
+ // 10m total supply
 
 // calculatePriceForBundlePercent(
 //   ethToAddToLP,
@@ -179,6 +184,8 @@ const floor = (n) => {
 //   bundlerPercent,
 //   totalSupply
 // );
+
+
 
 
 

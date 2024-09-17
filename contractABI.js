@@ -15,6 +15,16 @@ const contractABI = [
   { "inputs": [], "name": "Bundler__OnlyAdmin", "type": "error" },
   {
     "inputs": [],
+    "name": "Bundler__PercentToSellCannotExceed100",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Bundler__PercentToSellCannotSubceed1",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "Bundler__TokenAddressDoesNotExist",
     "type": "error"
   },
@@ -124,7 +134,8 @@ const contractABI = [
   {
     "inputs": [
       { "internalType": "address", "name": "tokenAddress", "type": "address" },
-      { "internalType": "address", "name": "sendEthTo", "type": "address" }
+      { "internalType": "address", "name": "sendEthTo", "type": "address" },
+      { "internalType": "uint256", "name": "percentToSell", "type": "uint256" }
     ],
     "name": "bundleSells",
     "outputs": [],
@@ -249,6 +260,7 @@ const contractABI = [
     "inputs": [
       { "internalType": "address", "name": "tokenAddress", "type": "address" },
       { "internalType": "address", "name": "ownerAddress", "type": "address" },
+      { "internalType": "uint256", "name": "percentToSell", "type": "uint256" },
       { "internalType": "address", "name": "sendEthTo", "type": "address" },
       { "internalType": "uint256", "name": "minAmount", "type": "uint256" },
       { "internalType": "uint256", "name": "deadline", "type": "uint256" }
@@ -291,4 +303,4 @@ const contractABI = [
   }
 ]
 
-module.exports = contractABI
+module.exports = contractABI;
