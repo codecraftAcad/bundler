@@ -1,4 +1,7 @@
-
+const isValidEthereumAddress = (address) => {
+  // Basic check for valid Ethereum address (length and starts with "0x")
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+};
 
 const handleDeploySteps1 = async (ctx) => {
     ctx.session.tokenDetails.tokenName = ctx.message.text;
@@ -79,10 +82,28 @@ const handleDeploySteps9 = async (ctx) => {
 };
 
 const handleDeploySteps10 = async (ctx) => {
-    ctx.session.tokenDetails.taxWallet = ctx.message.text ;
-    console.log("Final Token Details:", ctx.session.tokenDetails);
-    
-    // Proceed with deployment or any other follow-up action
+  const taxWallet = ctx.message.text;
+
+  // Check if the tax wallet is a valid Ethereum address
+  if (!isValidEthereumAddress(taxWallet)) {
+    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
+    return;
+  }
+
+  ctx.session.tokenDetails.taxWallet = taxWallet;
+  console.log("Final Token Details:", ctx.session.tokenDetails);
+   ctx.reply(
+        `Thank you for the info. We've got all we need to deploy your token`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "Proceed to deploy", callback_data: "deploy_token" }],
+            ],
+          },
+        }
+      );
+  
+  // Proceed with deployment or any other follow-up action
 };
 
 const handleSkip = async (ctx) => {
@@ -152,5 +173,6 @@ module.exports = {
     handleDeploySteps8,
     handleDeploySteps9,
     handleDeploySteps10,
-    handleSkip
+    handleSkip,
+    isValidEthereumAddress
 }

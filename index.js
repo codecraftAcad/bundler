@@ -12,6 +12,7 @@ const {
   handleDeploySteps8,
   handleDeploySteps9,
   handleDeploySteps10,
+  isValidEthereumAddress,
 } = require("./steps");
 const connectDB = require("./connect");
 const {
@@ -132,16 +133,7 @@ deployScene.on("message", async (ctx) => {
 
     case 10:
       await handleDeploySteps10(ctx);
-      ctx.reply(
-        `Thank you for the info. We've got all we need to deploy your token`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "Proceed to deploy", callback_data: "deploy_token" }],
-            ],
-          },
-        }
-      );
+     
 
       break;
 
@@ -279,11 +271,7 @@ tokenScene.enter(async (ctx) => {
 
     if (deployedTokens.length === 0) {
       // No tokens found
-      ctx.reply("You've not created any token", {
-        reply_markup: {
-          inline_keyboard: [[{ text: "Back", callback_data: "back_button" }]],
-        },
-      });
+      ctx.reply("You've not created any token");
     } else {
       // Tokens exist, show inline keyboard with token names and tickers side by side
       let tokenButtons = [];
@@ -643,31 +631,27 @@ tokenScene.on("callback_query", async (ctx) => {
             inline_keyboard: [
               [
                 {
-                  text: "🛠️ Update Buy Tax",
+                  text: "🛠️ Update Tax",
                   callback_data: `change_buyTax|${token.contractAddress}`,
-                },
-                {
-                  text: "🛠️ Update Sell Tax",
-                  callback_data: `change_sellTax|${token.contractAddress}`,
-                },
+                }
               ],
               [
                 {
-                  text: "💸 Sell Holdings",
+                  text: "💸 Single Sell",
                   callback_data: `sell_holdings|${token.contractAddress}`,
                 },
                 {
-                  text: "💼 Sell All Holdings",
+                  text: "💼 Sell All Holdings‼️",
                   callback_data: `sell_all|${token.contractAddress}`,
                 },
               ],
               [
                 {
-                  text: "Sell Simultaneously",
+                  text: "Multi Sell",
                   callback_data: `simultaneous_sell|${token.contractAddress}`,
                 },
                 {
-                  text: "Withdraw ETH",
+                  text: "Withdraw Tax",
                   callback_data: `withdraw_eth|${token.contractAddress}`,
                 },
               ],
@@ -785,7 +769,8 @@ simultaneousScene.on("callback_query", async (ctx) => {
 simultaneousScene.on("message", async (ctx) => {
   const simultaneousStep = ctx.session.simultaneousScene || 1;
   const contractAddress = ctx.session.contractAddress;
-  const percentSell = ctx.session.percentSell * 10;
+  let percentSell = ctx.session.percentSell;
+ 
   if (
     percentSell == 25 ||
     percentSell == 50 ||
@@ -793,10 +778,15 @@ simultaneousScene.on("message", async (ctx) => {
     percentSell == 100
   ) {
     const sendEthTo = ctx.message.text;
+     if(!isValidEthereumAddress(sendEthTo)) {
+    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
+    return;
+  }
     ctx.reply(
       `Attempting to sell ${percentSell}% of tokens from all bundled wallets `
     );
     try {
+        percentSell = percentSell * 10
       const simHash = await bundleSell(contractAddress, sendEthTo, percentSell);
       console.log(simHash);
       ctx.reply(`Sell transaction successful. Transaction Hash: ${simHash}`);
@@ -816,6 +806,10 @@ simultaneousScene.on("message", async (ctx) => {
 
       case 2:
         const sendEthTo = ctx.message.text;
+        if(!isValidEthereumAddress(sendEthTo)) {
+    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
+    return;
+  }
         percentSell = ctx.session.percentSell * 10;
         ctx.reply(
           `Attempting to sell ${
@@ -934,6 +928,10 @@ holdingsScene.on("message", async (ctx) => {
     percentSell == 100
   ) {
     const sendEthTo = ctx.message.text;
+    if(!isValidEthereumAddress(sendEthTo)) {
+    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
+    return;
+  }
     percentSell = percentSell * 10;
     ctx.reply(
       `Attempting to sell ${percentSell / 10}% of token from ${selectedWalletAddress} `
@@ -965,6 +963,10 @@ holdingsScene.on("message", async (ctx) => {
     try {
       percentSell = percentSell * 10;
       const sendEthTo = ctx.message.text;
+      if(!isValidEthereumAddress(sendEthTo)) {
+    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
+    return;
+  }
       const sellHash = await sellTokensInAddress(
         contractAddress,
         selectedWalletAddress,
@@ -993,6 +995,10 @@ sellAllScene.enter(async (ctx) => {
 
 sellAllScene.on("message", async (ctx) => {
   const sendEthTo = ctx.message.text;
+  if(!isValidEthereumAddress(sendEthTo)) {
+    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
+    return;
+  }
   const contractAddress = ctx.session.contractAddress;
   await ctx.reply(`Attempting to sell tokens from all bundle wallets...`);
   const percentToSell = 100 * 10;
