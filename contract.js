@@ -122,9 +122,7 @@ async function enableTradingAddLpPeformSwap(
       { hash: tx.hash }
     );
 
-    return tx.hash
-
-    
+    return tx.hash;
   } catch (error) {
     console.log("Error from enableTradingAddLpPeformSwap()", error);
   }
@@ -138,7 +136,7 @@ async function sellTokensInAddress(
   amountOutMin,
   deadline
 ) {
-   const ethBalBefore = await provider.getBalance(signer.address);
+  const ethBalBefore = await provider.getBalance(signer.address);
   try {
     const sellTokenstx = await contractWithSigner.sellPerAddress(
       tokenAddress,
@@ -149,15 +147,15 @@ async function sellTokensInAddress(
       deadline
     );
     const ethBalAfter = await provider.getBalance(signer.address);
-  if (Number(ethBalAfter) > Number(ethBalBefore)) {
-    console.log(`sold from ${sendEthTo} successfully`, {
-      balBefore: ethers.utils.formatEther(ethBalBefore),
-      balAfter: ethers.utils.formatEther(ethBalAfter),
-    });
-  }
- 
+    if (Number(ethBalAfter) > Number(ethBalBefore)) {
+      console.log(`sold from ${sendEthTo} successfully`, {
+        balBefore: ethers.utils.formatEther(ethBalBefore),
+        balAfter: ethers.utils.formatEther(ethBalAfter),
+      });
+    }
+
     console.log("successful sellTokensInAddress()", sellTokenstx.hash);
-     return sellTokenstx.hash
+    return sellTokenstx.hash;
   } catch (error) {
     console.log("error from sellTokensInAddress()", error);
   }
@@ -196,7 +194,7 @@ async function bundleSell(tokenAddress, sendEthTo, percentToSell) {
       percentToSell
     );
     console.log("successful bundelSell()", { hash: bundleSellsTx.hash });
-    return bundleSellsTx.hash
+    return bundleSellsTx.hash;
   } catch (error) {
     console.log("Error from bundleSells()", error);
   }
@@ -224,6 +222,20 @@ async function updateTaxes(tokenAddress, newBuyTax, newSellTax) {
     console.log(`successfully updated taxed: `, { hash: tx.hash });
   } catch (error) {
     console.log("Error from updateTaxes()", error);
+  }
+}
+
+async function withdrawTax(tokenAddress, taxWalletAddress) {
+  try {
+    const token = new ethers.Contract(tokenAddress, TokenABI, signer);
+    const tx = await token.swapTokensToETH(
+      0,
+      Math.floor(Date.now() / 1000 + 1800),
+      taxWalletAddress
+    );
+    console.log(`tax withdrawal successful: `, { hash: tx.hash });
+  } catch (error) {
+    console.log("Error from withdrawTax()", error);
   }
 }
 
@@ -365,40 +377,34 @@ async function ExamplePerimeterForTx() {
   });
 }
 
-const getBuyTax = async(tokenAddress)=>{
+const getBuyTax = async (tokenAddress) => {
   const token = new ethers.Contract(tokenAddress, TokenABI, signer);
-  const buyTax = await token.buyTax()
+  const buyTax = await token.buyTax();
 
-  console.log(Number(buyTax))
-  return Number(buyTax)
-}
+  console.log(Number(buyTax));
+  return Number(buyTax);
+};
 
-const getSellTax = async(tokenAddress)=>{
-   const token = new ethers.Contract(tokenAddress, TokenABI, signer);
-  const sellTax = await token.sellTax()
+const getSellTax = async (tokenAddress) => {
+  const token = new ethers.Contract(tokenAddress, TokenABI, signer);
+  const sellTax = await token.sellTax();
 
-  console.log(Number(sellTax))
-  return Number(sellTax)
-}
-
-
+  console.log(Number(sellTax));
+  return Number(sellTax);
+};
 
 const getTokenBalance = async (tokenAddress, walletAddress) => {
   const token = new ethers.Contract(tokenAddress, TokenABI, signer);
 
-  
   const tokenBalance = await token.balanceOf(walletAddress);
 
   const decimals = await token.decimals();
 
-  
   const formattedBalance = ethers.utils.formatUnits(tokenBalance, decimals);
 
-
   console.log(Number(formattedBalance).toFixed(1));
-  return Number(formattedBalance).toFixed(1)
+  return Number(formattedBalance).toFixed(1);
 };
-
 
 // ExamplePerimeterForTx();
 module.exports = {
@@ -411,5 +417,6 @@ module.exports = {
   getDeployedTokens,
   getBuyTax,
   getSellTax,
-  getTokenBalance
+  getTokenBalance,
+  withdrawTax,
 };
