@@ -91,7 +91,23 @@ const handleDeploySteps10 = async (ctx) => {
   }
 
   ctx.session.tokenDetails.taxWallet = taxWallet;
-  console.log("Final Token Details:", ctx.session.tokenDetails);
+   await ctx.reply("Do you want to use random bundle wallets? Yes/No")
+
+      ctx.session.stepCount = 11;
+};
+
+const handleDeploySteps11= async(ctx)=>{
+    ctx.session.randomWallets = ctx.message.text
+    console.log(ctx.session.randomWallets.toLowerCase())
+    console.log(ctx.session.randomWallets)
+
+   if (ctx.session.randomWallets.toLowerCase() !== "yes" && ctx.session.randomWallets.toLowerCase() !== "no") {
+    await ctx.reply("Invalid answer, please provide a valid reply (yes or no)");
+    return;
+}
+
+
+    console.log("Final Token Details:", ctx.session.tokenDetails);
    ctx.reply(
         `Thank you for the info. We've got all we need to deploy your token`,
         {
@@ -102,9 +118,7 @@ const handleDeploySteps10 = async (ctx) => {
           },
         }
       );
-  
-  // Proceed with deployment or any other follow-up action
-};
+}
 
 const handleSkip = async (ctx) => {
     const callbackData = ctx.callbackQuery.data;
@@ -173,6 +187,7 @@ module.exports = {
     handleDeploySteps8,
     handleDeploySteps9,
     handleDeploySteps10,
+    handleDeploySteps11,
     handleSkip,
     isValidEthereumAddress
 }

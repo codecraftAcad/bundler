@@ -17,6 +17,7 @@
     "@uniswap/sdk-core": "^5.4.0",
     "@uniswap/v2-sdk": "^4.4.1",
     "axios": "^1.7.7",
+    "csv-writer": "^1.6.0",
     "dotenv": "^16.4.5",
     "ethers": "^5.7.2",
     "mongoose": "^8.6.2",

@@ -35,8 +35,12 @@ const tokenSchema = new mongoose.Schema({
     required:true
   },
   bundledWallets: {
-    type: [bundleWalletSchema],
+    type: [mongoose.Schema.Types.Mixed], // Allows either objects or strings
     default: []
+  },
+  taxWallet: {
+    type: String,
+    required: true
   }
 
 }, {

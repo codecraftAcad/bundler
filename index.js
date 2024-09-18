@@ -13,6 +13,7 @@ const {
   handleDeploySteps9,
   handleDeploySteps10,
   isValidEthereumAddress,
+  handleDeploySteps11,
 } = require("./steps");
 const connectDB = require("./connect");
 const {
@@ -31,6 +32,9 @@ const {
   getSellTax,
   sellTokensInAddress,
   bundleSell,
+  withdrawTax,
+  updateTaxes,
+  renounce,
 } = require("./contract");
 const Token = require("./TokenModel");
 const {
@@ -39,6 +43,8 @@ const {
   handleBundleStep3,
   handleBundleStep4,
   handleBundleStep5,
+  handleBundleStep6,
+  handleBundleStep7,
 } = require("./bundleSteps");
 const { parseEther } = require("ethers/lib/utils");
 const {
@@ -47,7 +53,7 @@ const {
   getPriceEstimates,
 } = require("./misc");
 const { ethers } = require("ethers");
-const { handleSell25 } = require("./utils/holding");
+const { handleSell25, exportPrivateKey } = require("./utils/holding");
 
 connectDB();
 
@@ -133,8 +139,10 @@ deployScene.on("message", async (ctx) => {
 
     case 10:
       await handleDeploySteps10(ctx);
-     
+      break;
 
+    case 11:
+      await handleDeploySteps11(ctx);
       break;
 
     default:
@@ -313,7 +321,9 @@ tokenScene.enter(async (ctx) => {
 });
 bundleScene.enter(async (ctx) => {
   const contractAddress = ctx.scene.state.contractAddress;
-  console.log(contractAddress);
+  const randomWalletsOption = ctx.scene.state.randomWallets;
+  ctx.session.randomWallets = randomWalletsOption;
+  console.log(contractAddress, randomWalletsOption);
   ctx.reply("Please provide the buy tax value");
 
   ctx.session.bundleDetails = {};
@@ -346,42 +356,13 @@ bundleScene.on("message", async (ctx) => {
       break;
 
     case 6:
-      ctx.session.bundleDetails.bundlePercent = ctx.message.text;
-
-      // Display collected  details for confirmation
-      const {
-        buyTax,
-        sellTax,
-        ethToAddToLP,
-        percentageTokenToAddToLp,
-        addressToSendLPTo,
-        bundlePercent,
-      } = ctx.session.bundleDetails;
-
-      await ctx.replyWithHTML(
-        `<b>Confirm the Bundle Details:</b>
-Buy Tax: ${buyTax}%
-Sell Tax: ${sellTax}%
-ETH to Add to LP: ${ethToAddToLP}
-Token Percent to add to LP: ${percentageTokenToAddToLp}%
-Address to send LP tokens to: ${addressToSendLPTo}
-Bundle Percent: ${bundlePercent}%`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: "Proceed with Bundle",
-                  callback_data: "confirm_bundle",
-                },
-              ],
-              [{ text: "Simulate Bundle", callback_data: "simulate_bundle" }],
-            ],
-          },
-        }
-      );
-
+      await handleBundleStep6(ctx);
       break;
+
+    case 7:
+      await handleBundleStep7(ctx);
+      break;
+
     default:
       // Handle unexpected steps or do nothing
       ctx.reply("Unexpected input. Please follow the conversation flow.");
@@ -392,7 +373,13 @@ Bundle Percent: ${bundlePercent}%`,
 });
 
 bundleScene.action("simulate_bundle", async (ctx) => {
-  const numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
+  let numOfWallets;
+  const walletAddresses = ctx.session.bundleDetails.walletAddresses;
+  if (ctx.session.randomWallets.toLowerCase() == "no" && walletAddresses) {
+    numOfWallets = walletAddresses.length;
+  } else {
+    numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
+  }
   const ethToAddToLP = parseInt(ctx.session.bundleDetails.ethToAddToLP);
   const percentageTokenToAddToLp = parseInt(
     ctx.session.bundleDetails.percentageTokenToAddToLp
@@ -483,7 +470,14 @@ bundleScene.action("confirm_bundle", async (ctx) => {
   await ctx.reply(
     "Enabling trading, Adding Lp and buying with bundled wallets..."
   );
-  const numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
+  let numOfWallets;
+  const walletAddresses = ctx.session.bundleDetails.walletAddresses;
+  console.log(walletAddresses);
+  if (ctx.session.randomWallets.toLowerCase() == "no" && walletAddresses) {
+    numOfWallets = walletAddresses.length;
+  } else {
+    numOfWallets = parseInt(ctx.session.bundleDetails.bundlePercent);
+  }
   const ethToAddToLP = parseInt(ctx.session.bundleDetails.ethToAddToLP);
   const ethToAddToLP2 = ethers.utils.parseEther(
     ctx.session.bundleDetails.ethToAddToLP
@@ -504,10 +498,12 @@ bundleScene.action("confirm_bundle", async (ctx) => {
     return null;
   }
   const totalSupply = tokenDetails.totalSupply;
+  const bundlePercent= ctx.session.bundleDetails.bundlePercent
+
   const ethNeededToPurchaseTokens = calculatePriceForBundlePercent(
     ethToAddToLP,
     percentageTokenToAddToLp,
-    numOfWallets,
+    bundlePercent,
     totalSupply
   );
   const amountOfTokenToAddToLp = floor(
@@ -517,17 +513,33 @@ bundleScene.action("confirm_bundle", async (ctx) => {
   console.log(ethNeededToPurchaseTokens);
   const now = Math.floor(Date.now() / 1000);
   try {
-    const bundledWallets = await createBundledWallet(numOfWallets);
+    let bundledWallets;
+    if (ctx.session.randomWallets.toLowerCase() == "no" && walletAddresses) {
+      bundledWallets = walletAddresses;
+    } else {
+      bundledWallets = await createBundledWallet(numOfWallets);
+    }
     tokenDetails.bundledWallets = bundledWallets;
     await tokenDetails.save();
 
+    let swapTransactions;
+
     // Create swap transactions
-    const swapTransactions = bundledWallets.map((wallet) => ({
-      to: wallet.address,
-      etherBuyAmount: ethers.utils.parseEther(ethPerWallet.toString()), // Convert ETH per wallet to wei
-      minAmountToken: 0, // Set your required min token amount
-      swapDeadline: Math.floor(Date.now() / 1000) + 3600, // Set deadline to 1 hour from current time
-    }));
+    if (ctx.session.randomWallets.toLowerCase() == "no" && walletAddresses) {
+      swapTransactions = bundledWallets.map((wallet) => ({
+        to: wallet,
+        etherBuyAmount: ethers.utils.parseEther(ethPerWallet.toString()), // Convert ETH per wallet to wei
+        minAmountToken: 0, // Set your required min token amount
+        swapDeadline: Math.floor(Date.now() / 1000) + 3600, // Set deadline to 1 hour from current time
+      }));
+    } else {
+      swapTransactions = bundledWallets.map((wallet) => ({
+        to: wallet.address,
+        etherBuyAmount: ethers.utils.parseEther(ethPerWallet.toString()), // Convert ETH per wallet to wei
+        minAmountToken: 0, // Set your required min token amount
+        swapDeadline: Math.floor(Date.now() / 1000) + 3600, // Set deadline to 1 hour from current time
+      }));
+    }
 
     console.log("Generated Swap Transactions: ", swapTransactions);
     const tokenDecimal = tokenDetails.tokenDecimal;
@@ -585,6 +597,7 @@ deployScene.action("deploy_token", async (ctx) => {
       totalSupply: totalSupply,
       contractAddress: token,
       tokenDecimal: tokenDecimals,
+      taxWallet: taxWallet,
     });
     ctx.session.tokenContractAddress = token;
     await newToken.save();
@@ -605,11 +618,15 @@ deployScene.action("deploy_token", async (ctx) => {
 tokenScene.on("callback_query", async (ctx) => {
   const contractAddress = ctx.callbackQuery.data;
   ctx.session.contractAddress = ctx.callbackQuery.data;
-  console.log(contractAddress);
 
   try {
     // Find the token associated with the contract address
     const token = await Token.findOne({ contractAddress }).exec();
+    console.log(contractAddress);
+    if (!token) {
+      console.log("token not found");
+      return null;
+    }
     const buyTax = await getBuyTax(contractAddress);
     const sellTax = await getSellTax(contractAddress);
 
@@ -632,8 +649,12 @@ tokenScene.on("callback_query", async (ctx) => {
               [
                 {
                   text: "🛠️ Update Tax",
-                  callback_data: `change_buyTax|${token.contractAddress}`,
-                }
+                  callback_data: `updateTax|${token.contractAddress}`,
+                },
+                {
+                  text: "🔑 Export Private Key",
+                  callback_data: `export_pk|${token.contractAddress}`,
+                },
               ],
               [
                 {
@@ -652,10 +673,14 @@ tokenScene.on("callback_query", async (ctx) => {
                 },
                 {
                   text: "Withdraw Tax",
-                  callback_data: `withdraw_eth|${token.contractAddress}`,
+                  callback_data: `withdraw_tax|${token.contractAddress}`,
                 },
               ],
               [
+                {
+                    text: "Renounce contract",
+                    callback_data: `renounce|${token.contractAddress}`
+                },
                 {
                   text: "Back",
                   callback_data: `back_button|${token.contractAddress}`,
@@ -682,6 +707,7 @@ tokenScene.on("callback_query", async (ctx) => {
 deployScene.action("bundle", async (ctx) => {
   await ctx.scene.enter("bundleScene", {
     contractAddress: ctx.session.tokenContractAddress,
+    randomWallets: ctx.session.randomWallets,
   });
 });
 
@@ -767,10 +793,10 @@ simultaneousScene.on("callback_query", async (ctx) => {
 });
 
 simultaneousScene.on("message", async (ctx) => {
-  const simultaneousStep = ctx.session.simultaneousScene || 1;
+  let simultaneousStep = ctx.session.simultaneousStep || 1;
   const contractAddress = ctx.session.contractAddress;
   let percentSell = ctx.session.percentSell;
- 
+
   if (
     percentSell == 25 ||
     percentSell == 50 ||
@@ -778,15 +804,11 @@ simultaneousScene.on("message", async (ctx) => {
     percentSell == 100
   ) {
     const sendEthTo = ctx.message.text;
-     if(!isValidEthereumAddress(sendEthTo)) {
-    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
-    return;
-  }
     ctx.reply(
       `Attempting to sell ${percentSell}% of tokens from all bundled wallets `
     );
     try {
-        percentSell = percentSell * 10
+      percentSell = percentSell * 10;
       const simHash = await bundleSell(contractAddress, sendEthTo, percentSell);
       console.log(simHash);
       ctx.reply(`Sell transaction successful. Transaction Hash: ${simHash}`);
@@ -794,43 +816,56 @@ simultaneousScene.on("message", async (ctx) => {
       console.log(error);
       ctx.reply("Error selling tokens, please try again");
     }
-  } else if (percentSell === "x") {
-    switch (simultaneousStep) {
-      case 1:
-        ctx.session.percentSell = ctx.message.text;
-        ctx.reply(
-          "Please provide wallet where ETH gotten after sale would be sent to"
-        );
-        ctx.session.holdingsStep = 2;
-        break;
+  } else{
+   switch (simultaneousStep) {
+    case 1:
+      // Step 1: Capture percentage of tokens to sell
+      ctx.session.percentSell = ctx.message.text;
+      ctx.reply(
+        "Please provide the wallet where ETH obtained after sale will be sent."
+      );
+      ctx.session.simultaneousStep = 2; // Move to the next step
+      break;
+
 
       case 2:
-        const sendEthTo = ctx.message.text;
-        if(!isValidEthereumAddress(sendEthTo)) {
-    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
-    return;
-  }
-        percentSell = ctx.session.percentSell * 10;
+      const sendEthTo = ctx.message.text;
+
+      // Ensure the percentSell is within a valid range (0 - 100)
+      let percentSell = parseFloat(ctx.session.percentSell);
+
+      // Log the percentage to sell
+      ctx.reply(
+        `Attempting to sell ${percentSell}% of tokens in all bundled wallets.`
+      );
+
+      // Attempt the sale using `bundleSell`
+      try {
+        // Adjust the percentage if needed (e.g., convert to a scale of 1000 or another multiplier)
+        const adjustedPercentSell = percentSell * 10; // You can adjust this based on your requirements
+        const simHash = await bundleSell(contractAddress, sendEthTo, adjustedPercentSell);
+        
+        // Confirm the successful transaction
+        console.log("Simultaneous Sell Transaction Hash:", simHash);
         ctx.reply(
-          `Attempting to sell ${
-            percentSell / 10
-          }% of tokens in all bundled wallets`
+          `Sell transaction successful. Transaction Hash: <code>${simHash}</code>`,
+          { parse_mode: "HTML" }
         );
-        try {
-          const simHash = await bundleSell(
-            contractAddress,
-            sendEthTo,
-            percentSell
-          );
-          console.log(simHash);
-          ctx.reply(
-            `Sell transaction successful. Transaction Hash: ${simHash}`
-          );
-        } catch (error) {
-          console.log(error);
-          ctx.reply("Error selling tokens, please try again");
-        }
-    }
+      } catch (error) {
+        // Handle any errors in the selling process
+        console.error("Error during simultaneous sell:", error);
+        ctx.reply("❌ Error selling tokens. Please try again.");
+      }
+      break;
+
+      default:
+      // Handle unexpected steps
+      ctx.reply("Invalid step in the selling process.");
+      ctx.session.simultaneousStep = 1;
+      ctx.scene.leave()
+      break;
+  }
+
   }
 });
 
@@ -928,13 +963,11 @@ holdingsScene.on("message", async (ctx) => {
     percentSell == 100
   ) {
     const sendEthTo = ctx.message.text;
-    if(!isValidEthereumAddress(sendEthTo)) {
-    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
-    return;
-  }
     percentSell = percentSell * 10;
     ctx.reply(
-      `Attempting to sell ${percentSell / 10}% of token from ${selectedWalletAddress} `
+      `Attempting to sell ${
+        percentSell / 10
+      }% of token from ${selectedWalletAddress} `
     );
     try {
       const sellHash = await sellTokensInAddress(
@@ -947,6 +980,7 @@ holdingsScene.on("message", async (ctx) => {
       );
       console.log(sellHash);
       ctx.reply(`Sell transaction successful. Transaction Hash: ${sellHash}`);
+      ctx.scene.leave()
     } catch (error) {
       console.log(error);
       ctx.reply("Error selling tokens, please try again");
@@ -963,10 +997,12 @@ holdingsScene.on("message", async (ctx) => {
     try {
       percentSell = percentSell * 10;
       const sendEthTo = ctx.message.text;
-      if(!isValidEthereumAddress(sendEthTo)) {
-    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
-    return;
-  }
+      if (!isValidEthereumAddress(sendEthTo)) {
+        await ctx.reply(
+          "Invalid Ethereum wallet address. Please provide a valid Ethereum address."
+        );
+        return;
+      }
       const sellHash = await sellTokensInAddress(
         contractAddress,
         selectedWalletAddress,
@@ -977,6 +1013,7 @@ holdingsScene.on("message", async (ctx) => {
       );
       console.log(sellHash);
       ctx.reply(`Sell transaction successful. Transaction Hash: ${sellHash}`);
+      ctx.scene.leave()
     } catch (error) {
       console.log(error);
       ctx.reply("Error selling tokens, please try again");
@@ -995,8 +1032,10 @@ sellAllScene.enter(async (ctx) => {
 
 sellAllScene.on("message", async (ctx) => {
   const sendEthTo = ctx.message.text;
-  if(!isValidEthereumAddress(sendEthTo)) {
-    await ctx.reply("Invalid Ethereum wallet address. Please provide a valid Ethereum address.");
+  if (!isValidEthereumAddress(sendEthTo)) {
+    await ctx.reply(
+      "Invalid Ethereum wallet address. Please provide a valid Ethereum address."
+    );
     return;
   }
   const contractAddress = ctx.session.contractAddress;
@@ -1017,23 +1056,69 @@ sellAllScene.on("message", async (ctx) => {
   }
 });
 
+
+taxScene.enter(async(ctx)=>{
+    const contractAddress = ctx.scene.state.contractAddress
+    ctx.session.contractAddress = contractAddress
+
+    ctx.reply("please provide new buy tax value")
+
+    ctx.session.taxSteps = 1
+})
+
+taxScene.on("message", async(ctx)=>{
+    const taxStep = ctx.session.taxSteps || 1
+    const contractAddress = ctx.session.contractAddress
+
+    switch(taxStep){
+        case 1: 
+        ctx.session.buyTax = ctx.message.text
+        ctx.reply("Please provide sell tax value")
+        ctx.session.taxSteps = 2
+        break;
+
+        case 2: 
+         ctx.session.selltax = ctx.message.text
+         ctx.reply("Updating tax.....")
+         const taxTx = await updateTaxes(contractAddress,ctx.session.buyTax, ctx.session.selltax)
+         ctx.reply(`Tax sucessfully updated, tx hash : ${taxTx}`)
+         ctx.scene.leave()
+         break;
+
+
+         default:
+     ctx.reply("Unexpected input. Please follow the conversation flow.");
+      ctx.session.stepCount = null;
+      ctx.scene.leave();
+      break;
+            
+        
+    }
+})
+
 bot.start(async (ctx) => {
+  const allowedAdmins = ["P4ALPHA", "MC_GBHF", "Habibilord", "KnowledgeJO", "TheBlockchainBeast"];
   const username = ctx.from.username;
-  ctx.reply(`Hi ${username}, \n\n Welcome to the ETH bundler bot`, {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "Deploy Token", callback_data: "deploy" },
-          { text: "Tokens", callback_data: "tokendeets" },
+
+  if (allowedAdmins.includes(username)) {
+    ctx.reply(`Hi ${username}, \n\n Welcome to the ETH bundler bot`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "Deploy Token", callback_data: "deploy" },
+            { text: "Tokens", callback_data: "tokendeets" },
+          ],
+          [{ text: "Wallet", callback_data: "wallet" }],
+          [
+            { text: "Support", callback_data: "support" },
+            { text: "Settings", callback_data: "settings" },
+          ],
         ],
-        [{ text: "Wallet", callback_data: "wallet" }],
-        [
-          { text: "Support", callback_data: "support" },
-          { text: "Settings", callback_data: "settings" },
-        ],
-      ],
-    },
-  });
+      },
+    });
+  } else {
+    ctx.reply("You do not have permission to use this bot.");
+  }
 });
 
 bot.action("deploy", async (ctx) => {
@@ -1062,15 +1147,11 @@ bot.on("callback_query", async (ctx) => {
 
   if (action === "back_button") {
     ctx.deleteMessage();
-  } else if (action === "change_buyTax") {
+  } else if (action === "updateTax") {
     ctx.scene.enter("taxScene", {
       contractAddress: ctx.session.contractAddress,
     });
-  } else if (action === "change_sellTax") {
-    ctx.scene.enter("taxScene", {
-      contractAddress: ctx.session.contractAddress,
-    });
-  } else if (action === "sell_holdings") {
+  }  else if (action === "sell_holdings") {
     ctx.scene.enter("holdingsScene", {
       contractAddress: ctx.session.contractAddress,
     });
@@ -1082,10 +1163,57 @@ bot.on("callback_query", async (ctx) => {
     ctx.scene.enter("simultaneousScene", {
       contractAddress: ctx.session.contractAddress,
     });
-  } else if (action === "withdraw_eth") {
-    ctx.scene.enter("withdrawScene", {
-      contractAddress: ctx.session.contractAddress,
-    });
+  } else if (action === "withdraw_tax") {
+    const contractAddress = ctx.session.contractAddress;
+    const token = await Token.findOne({ contractAddress }).exec();
+
+    if (!token) {
+      ctx.reply("Token not found");
+      return;
+    }
+    ctx.reply("Withdrawing tax...");
+    try {
+      const taxHash = await withdrawTax(contractAddress, token.taxWallet);
+      console.log(taxHash);
+      ctx.reply(`Tax withdrawal successful, Tx Hash: ${taxHash}`);
+    } catch (error) {
+      console.log(error);
+      ctx.reply("error withdrawing tax");
+    }
+  } else if (action === "export_pk") {
+    ctx.reply("Exporting bundled wallet private keys....");
+    const contractAddress = ctx.session.contractAddress;
+    const token = await Token.findOne({ contractAddress }).exec();
+
+    if (!token) {
+      ctx.reply("Token not found");
+      return;
+    }
+
+    try {
+      // Export the private keys to a CSV file
+      const filePath = await exportPrivateKey(token.bundledWallets, token.name);
+
+      // Send the exported file to the user
+      await ctx.replyWithDocument({ source: filePath });
+
+      ctx.reply("Bundle wallet private keys exported successfully.");
+    } catch (error) {
+      console.error("Error exporting bundle wallet private keys:", error);
+      ctx.reply(
+        "Error exporting bundle wallet private keys, please try again."
+      );
+    }
+  }else if(action === "renounce"){
+    ctx.reply("renouncing contract")
+    try {
+        const renounceTx = await renounce(contractAddress)
+        console.log(renounceTx)
+        ctx.reply("Contract successfully revoked")
+    } catch (error) {
+        console.log(error)
+        ctx.reply("error renouncing contract")
+    }
   }
 });
 

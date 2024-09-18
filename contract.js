@@ -6,7 +6,7 @@ const providerUrl = "https://asp-ample-marginally.ngrok-free.app/";
 
 const provider = new ethers.providers.JsonRpcProvider(providerUrl);
 
-const contractAddress = "0xe58cBE144dD5556C84874deC1b3F2d0D6Ac45F1b";
+const contractAddress = "0xA13d4a67745D4Ed129AF590c495897eE2C7F8Cfc";
 const contract = new ethers.Contract(contractAddress, contractABI, provider);
 const privateKey = process.env.PRIVATE_KEY;
 
@@ -23,7 +23,7 @@ async function getAdminAddress() {
 }
 
 getAdminAddress();
-
+ 
 async function deployToken(
   tokenName,
   tokenSymbol,
@@ -220,6 +220,7 @@ async function updateTaxes(tokenAddress, newBuyTax, newSellTax) {
     const tx = await contractWithSigner.sendTransactions(transactions);
 
     console.log(`successfully updated taxed: `, { hash: tx.hash });
+    return tx.hash
   } catch (error) {
     console.log("Error from updateTaxes()", error);
   }
@@ -248,6 +249,7 @@ function getTotalEthForTxs(listOfSwapTransactions) {
 
   return ethers.utils.parseEther(ethers.utils.formatEther(String(totalValue)));
 }
+
 
 // console.log(privateKey);
 // await deployToken(
@@ -406,6 +408,30 @@ const getTokenBalance = async (tokenAddress, walletAddress) => {
   return Number(formattedBalance).toFixed(1);
 };
 
+
+const renounce = async (tokenAddress) => {
+  try {
+    // Create the contract instance with token address, ABI, and signer
+    const token = new ethers.Contract(tokenAddress, TokenABI, signer);
+
+    // The dead address (burn address on Ethereum)
+    const deadAddress = "0x0000000000000000000000000000000000000000";
+
+    // Call the contract's method to update the admin address to the dead address
+    const changeAdminTx = await token.updateAdminAddress(deadAddress);
+
+    // Wait for the transaction to be mined
+    const receipt = await changeAdminTx.wait();
+
+    console.log("Admin address updated to dead address successfully:", receipt);
+    return receipt;
+  } catch (error) {
+    console.error("Error renouncing admin to dead address:", error);
+    throw error;
+  }
+};
+
+
 // ExamplePerimeterForTx();
 module.exports = {
   deployToken,
@@ -419,4 +445,5 @@ module.exports = {
   getSellTax,
   getTokenBalance,
   withdrawTax,
+  renounce
 };
