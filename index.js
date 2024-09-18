@@ -1217,4 +1217,9 @@ bot.on("callback_query", async (ctx) => {
   }
 });
 
-bot.launch();
+bot.launch({
+    webhook: {
+        domain: 'https://bundler-bz8q.onrender.com',
+        port: process.env.PORT || 3000,
+    },
+});
